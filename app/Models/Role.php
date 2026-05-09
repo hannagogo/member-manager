@@ -10,7 +10,9 @@ class Role extends Model
 {
     protected $fillable = [
         'code',
-        'name',
+        'short_name',
+        'name_ja',
+        'name_en',
         'description',
     ];
 
@@ -23,5 +25,12 @@ class Role extends Model
     {
         return $this->belongsToMany(Permission::class, 'role_permissions')
             ->withTimestamps();
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return app()->getLocale() === 'ja'
+            ? ($this->name_ja ?? $this->code)
+            : ($this->name_en ?? $this->code);
     }
 }

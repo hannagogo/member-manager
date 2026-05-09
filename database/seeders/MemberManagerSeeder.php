@@ -46,17 +46,41 @@ class MemberManagerSeeder extends Seeder
         );
 
         $roles = [
-            'md' => 'MD',
-            'senior_director' => 'シニアディレクター',
-            'dna_lt' => 'DNA LT',
-            'editor' => '編集者',
-            'viewer' => '閲覧者',
+            'managing_director' => [
+                'short' => 'MD',
+                'ja' => 'マネージングディレクター',
+                'en' => 'Managing Director',
+            ],
+            'senior_director' => [
+                'short' => 'SND',
+                'ja' => 'シニアディレクター',
+                'en' => 'Senior Director',
+            ],
+            'dna_lt' => [
+                'short' => 'DNA LT',
+                'ja' => 'DNA LT',
+                'en' => 'DNA LT',
+            ],
+            'editor' => [
+                'short' => 'EDITOR',
+                'ja' => '編集者',
+                'en' => 'Editor',
+            ],
+            'viewer' => [
+                'short' => 'VIEWER',
+                'ja' => '閲覧者',
+                'en' => 'Viewer',
+            ],
         ];
 
-        foreach ($roles as $code => $name) {
+        foreach ($roles as $code => $roleData) {
             Role::firstOrCreate(
                 ['code' => $code],
-                ['name' => $name]
+                [
+                    'short_name' => $roleData['short'],
+                    'name_ja' => $roleData['ja'],
+                    'name_en' => $roleData['en'],
+                ]
             );
         }
 
@@ -76,7 +100,7 @@ class MemberManagerSeeder extends Seeder
             );
         }
 
-        $md = Role::where('code', 'md')->first();
+        $md = Role::where('code', 'managing_director')->first();
         $editor = Role::where('code', 'editor')->first();
 
         $md->permissions()->syncWithoutDetaching(
