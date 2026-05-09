@@ -15,3 +15,9 @@ Route::get('/members/{member}', [MemberController::class, 'show']);
 Route::get('/organizations', [OrganizationController::class, 'index']);
 Route::get('/organizations/{organization}', [OrganizationController::class, 'show']);
 
+
+use App\Http\Controllers\Auth\GoogleAuthController;
+
+Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
+

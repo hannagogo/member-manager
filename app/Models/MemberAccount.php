@@ -9,6 +9,7 @@ class MemberAccount extends Model
 {
     protected $fillable = [
         'member_id',
+        'user_id',
         'provider',
         'account_identifier',
         'is_primary',
@@ -27,5 +28,10 @@ class MemberAccount extends Model
     public function member(): BelongsTo
     {
         return $this->belongsTo(Member::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }
