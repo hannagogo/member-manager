@@ -42,6 +42,11 @@ class Member extends Model
         return $this->hasMany(MemberRole::class);
     }
 
+    public function directPermissions(): HasMany
+    {
+        return $this->hasMany(MemberPermission::class);
+    }
+
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class, 'actor_member_id');
