@@ -11,7 +11,7 @@ use App\Http\Controllers\OrganizationController;
 
 Route::middleware(['auth', 'member.active'])->group(function () {
 
-    Route::get('/members', [MemberController::class, 'index']);
+    Route::get('/members', [MemberController::class, 'index'])->middleware('member.permission:member.view');
     Route::get('/members/{member}', [MemberController::class, 'show']);
 
     Route::get('/organizations', [OrganizationController::class, 'index']);

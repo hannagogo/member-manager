@@ -85,11 +85,14 @@ class MemberManagerSeeder extends Seeder
         }
 
         $permissions = [
+            'member.view' => 'メンバー閲覧',
+            'member.manage' => 'メンバー管理',
+            'organization.view' => '組織閲覧',
+            'organization.manage' => '組織管理',
             'mediawiki_read' => 'MediaWiki閲覧',
             'mediawiki_edit' => 'MediaWiki編集',
             'docs_read' => 'Google Docs閲覧',
             'docs_edit' => 'Google Docs編集',
-            'member_manage' => 'メンバー管理',
             'role_manage' => '役割管理',
         ];
 
@@ -105,11 +108,14 @@ class MemberManagerSeeder extends Seeder
 
         $md->permissions()->syncWithoutDetaching(
             Permission::whereIn('code', [
+                'member.view',
+                'member.manage',
+                'organization.view',
+                'organization.manage',
                 'mediawiki_read',
                 'mediawiki_edit',
                 'docs_read',
                 'docs_edit',
-                'member_manage',
                 'role_manage',
             ])->pluck('id')->all()
         );
