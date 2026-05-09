@@ -10,6 +10,7 @@ class MemberPermission extends Model
     protected $fillable = [
         'member_id',
         'permission_id',
+        'effect',
         'organization_id',
         'status',
         'granted_at',

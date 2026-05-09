@@ -5,13 +5,17 @@ namespace App\Services;
 use App\Models\Organization;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 class PermissionResolver
 {
     public function has(User $user, string $permission): bool
     {
-        return $this->permissions($user)
-            ->contains($permission);
+        if ($this->directDeniedPermissions($user)->contains($permission)) {
+            return false;
+        }
+
+        return $this->permissions($user)->contains($permission);
     }
 
     public function hasInOrganization(
@@ -19,14 +23,20 @@ class PermissionResolver
         Organization $organization,
         string $permission
     ): bool {
-
         $organizationIds = $this->organizationAndAncestorIds($organization);
+
+        if (
+            $this->directDeniedPermissionsInOrganization($user, $organizationIds)
+                ->contains($permission)
+        ) {
+            return false;
+        }
 
         return $this->permissionsInOrganization($user, $organizationIds)
             ->contains($permission);
     }
 
-    public function permissions(User $user)
+    public function permissions(User $user): Collection
     {
         return $user->memberAccounts()
             ->with([
@@ -42,13 +52,13 @@ class PermissionResolver
                 }
 
                 return $this->rolePermissionCodes($member)
-                    ->merge($this->directPermissionCodes($member));
+                    ->merge($this->directAllowedPermissionCodes($member));
             })
             ->unique()
             ->values();
     }
 
-    private function permissionsInOrganization(User $user, array $organizationIds)
+    private function permissionsInOrganization(User $user, array $organizationIds): Collection
     {
         return $user->memberAccounts()
             ->with([
@@ -64,55 +74,73 @@ class PermissionResolver
                 }
 
                 return $this->rolePermissionCodes($member, $organizationIds)
-                    ->merge($this->directPermissionCodes($member, $organizationIds));
+                    ->merge($this->directAllowedPermissionCodes($member, $organizationIds));
             })
             ->unique()
             ->values();
     }
 
-    private function rolePermissionCodes($member, ?array $organizationIds = null)
+    private function rolePermissionCodes($member, ?array $organizationIds = null): Collection
     {
         return $member->roles
             ->filter(fn ($memberRole) => $this->isGrantActive($memberRole))
-            ->filter(function ($memberRole) use ($organizationIds) {
-                if ($organizationIds === null) {
-                    return true;
-                }
-
-                if (! $memberRole->organization_id) {
-                    return true;
-                }
-
-                return in_array($memberRole->organization_id, $organizationIds, true);
-            })
+            ->filter(fn ($memberRole) => $this->matchesOrganizationScope($memberRole, $organizationIds))
             ->flatMap(fn ($memberRole) => $memberRole->role?->permissions ?? collect())
             ->pluck('code');
     }
 
-    private function directPermissionCodes($member, ?array $organizationIds = null)
+    private function directAllowedPermissionCodes($member, ?array $organizationIds = null): Collection
     {
         return $member->directPermissions
             ->filter(fn ($memberPermission) => $this->isGrantActive($memberPermission))
-            ->filter(function ($memberPermission) use ($organizationIds) {
-                if ($organizationIds === null) {
-                    return true;
-                }
-
-                if (! $memberPermission->organization_id) {
-                    return true;
-                }
-
-                return in_array($memberPermission->organization_id, $organizationIds, true);
-            })
+            ->filter(fn ($memberPermission) => $memberPermission->effect === 'allow')
+            ->filter(fn ($memberPermission) => $this->matchesOrganizationScope($memberPermission, $organizationIds))
             ->pluck('permission.code');
     }
 
-    private function organizationAndAncestorIds(
-        Organization $organization
-    ): array {
+    private function directDeniedPermissions(User $user): Collection
+    {
+        return $user->memberAccounts()
+            ->with('member.directPermissions.permission')
+            ->get()
+            ->flatMap(fn ($account) => $account->member?->directPermissions ?? collect())
+            ->filter(fn ($memberPermission) => $this->isGrantActive($memberPermission))
+            ->filter(fn ($memberPermission) => $memberPermission->effect === 'deny')
+            ->pluck('permission.code')
+            ->unique()
+            ->values();
+    }
 
+    private function directDeniedPermissionsInOrganization(User $user, array $organizationIds): Collection
+    {
+        return $user->memberAccounts()
+            ->with('member.directPermissions.permission')
+            ->get()
+            ->flatMap(fn ($account) => $account->member?->directPermissions ?? collect())
+            ->filter(fn ($memberPermission) => $this->isGrantActive($memberPermission))
+            ->filter(fn ($memberPermission) => $memberPermission->effect === 'deny')
+            ->filter(fn ($memberPermission) => $this->matchesOrganizationScope($memberPermission, $organizationIds))
+            ->pluck('permission.code')
+            ->unique()
+            ->values();
+    }
+
+    private function matchesOrganizationScope($grant, ?array $organizationIds): bool
+    {
+        if ($organizationIds === null) {
+            return true;
+        }
+
+        if (! $grant->organization_id) {
+            return true;
+        }
+
+        return in_array($grant->organization_id, $organizationIds, true);
+    }
+
+    private function organizationAndAncestorIds(Organization $organization): array
+    {
         $ids = [];
-
         $current = $organization;
 
         while ($current) {
@@ -129,10 +157,7 @@ class PermissionResolver
             return false;
         }
 
-        if (
-            $grant->revoked_at &&
-            Carbon::parse($grant->revoked_at)->isPast()
-        ) {
+        if ($grant->revoked_at && Carbon::parse($grant->revoked_at)->isPast()) {
             return false;
         }
 
