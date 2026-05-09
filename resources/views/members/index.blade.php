@@ -28,7 +28,7 @@
                 </td>
                 <td>
                     @foreach ($member->roles as $memberRole)
-                        <div>{{ $memberRole->role->name }}</div>
+                        <div>{{ $memberRole->role->display_name }}</div>
                     @endforeach
                 </td>
             </tr>

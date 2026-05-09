@@ -35,7 +35,7 @@
 <h3>Roles</h3>
 <ul>
 @foreach ($member->roles as $memberRole)
-    <li>{{ $memberRole->role->name }} / {{ $memberRole->status }}</li>
+    <li>{{ $memberRole->role->display_name }} / {{ $memberRole->status }}</li>
 @endforeach
 </ul>
 
