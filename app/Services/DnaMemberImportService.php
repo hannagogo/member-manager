@@ -49,6 +49,9 @@ class DnaMemberImportService
 
         DB::transaction(function () use ($rows, $header, $headerCount) {
 
+
+            $sponsorRelations = [];
+
             foreach ($rows as $row) {
 
                 if (count(array_filter($row)) === 0) {
@@ -82,7 +85,33 @@ class DnaMemberImportService
                 $this->importRole($member, $data);
                 $this->importOrganizations($member, $data);
                 $this->importAccounts($member, $data);
+
+                $sponsorName = trim((string) ($data['スポンサー名'] ?? ''));
+
+                if ($sponsorName !== '') {
+                    $sponsorRelations[] = [
+                        'member_id' => $member->id,
+                        'sponsor_name' => $sponsorName,
+                    ];
+                }
             }
+            foreach ($sponsorRelations as $relation) {
+
+                $sponsor = Member::query()
+                    ->where('display_name', $relation['sponsor_name'])
+                    ->first();
+
+                if (! $sponsor) {
+                    continue;
+                }
+
+                Member::query()
+                    ->where('id', $relation['member_id'])
+                    ->update([
+                        'sponsor_member_id' => $sponsor->id,
+                    ]);
+            }
+
         });
     }
 

@@ -3,10 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+
 
 class Member extends Model
 {
+    public function sponsor()
+    {
+        return $this->belongsTo(
+            self::class,
+            'sponsor_member_id'
+        );
+    }
+
+
     protected $fillable = [
         'display_name',
         'legal_name',
