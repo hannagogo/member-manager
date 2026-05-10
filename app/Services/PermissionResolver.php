@@ -6,12 +6,18 @@ use App\Models\Organization;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class PermissionResolver
 {
     public function has(User $user, string $permission): bool
     {
         return $this->trace($user, $permission)['result'] === 'allow';
+    }
+
+    public function clearUserCache(User $user): void
+    {
+        Cache::forget($this->cacheKey($user));
     }
 
     public function hasInOrganization(
@@ -24,19 +30,29 @@ class PermissionResolver
 
     public function trace(User $user, string $permission): array
     {
-        $deny = $this->findDirectDeny($user, $permission);
+        $cache = $this->permissionMap($user);
 
-        if ($deny) {
-            return $deny;
+        $traces = $cache[$permission] ?? [];
+
+        if (! is_array($traces) || array_is_list($traces) === false) {
+            $traces = [$traces];
         }
 
-        $allow = $this->findAllow($user, $permission);
+        $result = collect($traces)
+            ->contains(fn ($trace) => ($trace['result'] ?? null) === 'deny')
+                ? 'deny'
+                : (
+                    collect($traces)
+                        ->contains(fn ($trace) => ($trace['result'] ?? null) === 'allow')
+                        ? 'allow'
+                        : 'deny'
+                );
 
-        if ($allow) {
-            return $allow;
-        }
-
-        return $this->traceResult('deny', $permission, 'none', null, null, 'No matching permission grant.');
+        return [
+            'result' => $result,
+            'permission' => $permission,
+            'traces' => $traces,
+        ];
     }
 
     public function traceInOrganization(
@@ -44,15 +60,24 @@ class PermissionResolver
         Organization $organization,
         string $permission
     ): array {
+
         $organizationIds = $this->organizationAndAncestorIds($organization);
 
-        $deny = $this->findDirectDeny($user, $permission, $organizationIds);
+        $deny = $this->findDirectDeny(
+            $user,
+            $permission,
+            $organizationIds
+        );
 
         if ($deny) {
             return $deny;
         }
 
-        $allow = $this->findAllow($user, $permission, $organizationIds);
+        $allow = $this->findAllow(
+            $user,
+            $permission,
+            $organizationIds
+        );
 
         if ($allow) {
             return $allow;
@@ -189,6 +214,107 @@ class PermissionResolver
         }
 
         return null;
+    }
+
+
+    private function permissionMap(User $user): array
+    {
+        return Cache::remember(
+            $this->cacheKey($user),
+            now()->addMinutes(10),
+            fn () => $this->buildPermissionMap($user)
+        );
+    }
+
+    private function buildPermissionMap(User $user): array
+    {
+        $map = [];
+
+        $accounts = $user->memberAccounts()
+            ->with([
+                'member.roles.role.permissions',
+                'member.roles.organization',
+                'member.directPermissions.permission',
+                'member.directPermissions.organization',
+            ])
+            ->get();
+
+        foreach ($accounts as $account) {
+
+            $member = $account->member;
+
+            if (! $member) {
+                continue;
+            }
+
+            foreach ($member->roles as $memberRole) {
+
+                if (! $this->isGrantActive($memberRole)) {
+                    continue;
+                }
+
+                foreach ($memberRole->role?->permissions ?? [] as $permission) {
+
+                    $map[$permission->code] ??= [];
+
+                    $map[$permission->code][] = $this->traceResult(
+                        'allow',
+                        $permission->code,
+                        'role',
+                        $memberRole->role?->code,
+                        $memberRole->organization?->name,
+                        null
+                    );
+                }
+            }
+
+            foreach ($member->directPermissions as $memberPermission) {
+
+                if (! $this->isGrantActive($memberPermission)) {
+                    continue;
+                }
+
+                $permission = $memberPermission->permission;
+
+                if (! $permission) {
+                    continue;
+                }
+
+                if ($memberPermission->effect === 'deny') {
+
+                    $map[$permission->code] ??= [];
+
+                    $map[$permission->code][] = $this->traceResult(
+                        'deny',
+                        $permission->code,
+                        'direct_permission',
+                        $permission->code,
+                        $memberPermission->organization?->name,
+                        $memberPermission->reason
+                    );
+
+                    continue;
+                }
+
+                $map[$permission->code] ??= [];
+
+                $map[$permission->code][] = $this->traceResult(
+                    'allow',
+                    $permission->code,
+                    'direct_permission',
+                    $permission->code,
+                    $memberPermission->organization?->name,
+                    $memberPermission->reason
+                );
+            }
+        }
+
+        return $map;
+    }
+
+    private function cacheKey(User $user): string
+    {
+        return "permission-map:user:{$user->id}";
     }
 
     private function rolePermissionCodes($member, ?array $organizationIds = null): Collection
