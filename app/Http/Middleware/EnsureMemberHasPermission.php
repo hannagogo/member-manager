@@ -12,8 +12,7 @@ class EnsureMemberHasPermission
     public function handle(
         Request $request,
         Closure $next,
-        string $permission,
-        PermissionResolver $resolver
+        string $permission
     ): Response {
 
         $user = $request->user();
@@ -21,6 +20,8 @@ class EnsureMemberHasPermission
         if (! $user) {
             abort(401);
         }
+
+        $resolver = app(PermissionResolver::class);
 
         if (! $resolver->has($user, $permission)) {
             abort(403, 'Permission denied.');

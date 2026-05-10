@@ -1,30 +1,55 @@
-@extends('layouts.admin')
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Organizations</title>
 
-@section('content')
-<h2>Organizations</h2>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 24px;
+        }
 
-<table border="1" cellpadding="8" cellspacing="0">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Parent</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach ($organizations as $organization)
-            <tr>
-                <td>
-                    <a href="/organizations/{{ $organization->id }}">
-                        {{ $organization->name }}
-                    </a>
-                </td>
-                <td>{{ $organization->type }}</td>
-                <td>{{ $organization->parent?->name }}</td>
-                <td>{{ $organization->status }}</td>
-            </tr>
-        @endforeach
-    </tbody>
-</table>
-@endsection
+        ul {
+            line-height: 1.8;
+        }
+
+        .org-code {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Organizations</h1>
+
+@php
+function renderOrganizationTree($organizations) {
+    echo '<ul>';
+
+    foreach ($organizations as $organization) {
+
+        echo '<li>';
+
+        echo e($organization->name);
+
+        if ($organization->code) {
+            echo ' <span class="org-code">(' . e($organization->code) . ')</span>';
+        }
+
+        if ($organization->children->count()) {
+            renderOrganizationTree($organization->children);
+        }
+
+        echo '</li>';
+    }
+
+    echo '</ul>';
+}
+@endphp
+
+{!! renderOrganizationTree($organizations) !!}
+
+</body>
+</html>

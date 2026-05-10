@@ -8,24 +8,10 @@ class OrganizationController extends Controller
 {
     public function index()
     {
-        $organizations = Organization::with([
-            'parent',
-            'children',
-            'memberships.member',
-        ])->get();
+        $organizations = Organization::with('children')
+            ->whereNull('parent_id')
+            ->get();
 
         return view('organizations.index', compact('organizations'));
-    }
-
-    public function show(Organization $organization)
-    {
-        $organization->load([
-            'parent',
-            'children',
-            'memberships.member',
-            'memberRoles.role',
-        ]);
-
-        return view('organizations.show', compact('organization'));
     }
 }
